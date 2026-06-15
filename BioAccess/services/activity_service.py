@@ -63,9 +63,9 @@ class ActivityService:
                     SELECT al.*, u.full_name AS user_name, u.employee_id
                     FROM activity_logs al
                     LEFT JOIN users u ON u.id = al.user_id
-                    WHERE al.action ILIKE '%Windows Hello%'
-                       OR al.action ILIKE '%check-in%'
-                       OR al.action ILIKE '%check-out%'
+                    WHERE al.action ILIKE '%%Windows Hello%%'
+                       OR al.action ILIKE '%%check-in%%'
+                       OR al.action ILIKE '%%check-out%%'
                     ORDER BY al.timestamp DESC
                     LIMIT %s
                     """,

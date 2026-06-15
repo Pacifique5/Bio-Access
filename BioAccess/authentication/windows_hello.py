@@ -6,7 +6,6 @@ Uses PowerShell WinRT interop (reliable on desktop) with optional winsdk fallbac
 """
 
 import asyncio
-import json
 import subprocess
 from typing import Tuple
 
@@ -18,43 +17,27 @@ AVAILABILITY_MESSAGES = {
     "device_busy": "Biometric device is busy. Try again shortly.",
 }
 
-
-# PowerShell script: check availability and request verification via WinRT
-_PS_CHECK = r"""
+# Shared WinRT await helper – infers result type from IAsyncOperation<T>
+_PS_WINRT_HEADER = r"""
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
 $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
     $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
     $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
 })[0]
-Function Await($WinRtTask, $ResultType) {
-    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
-    $netTask = $asTask.Invoke($null, @($WinRtTask))
+Function AwaitResult($AsyncOp) {
+    $resultType = $AsyncOp.GetType().GetGenericArguments()[0]
+    $asTask = $asTaskGeneric.MakeGenericMethod($resultType)
+    $netTask = $asTask.Invoke($null, @($AsyncOp))
     $netTask.Wait(-1) | Out-Null
     $netTask.Result
 }
 [Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime] | Out-Null
-$avail = Await ([Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync()) ([Windows.Security.Credentials.UI.UserConsentVerifierAvailability])
-Write-Output $avail.ToString()
 """
 
-_PS_VERIFY = r"""
-param([string]$Message)
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {
-    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
-    $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
-})[0]
-Function Await($WinRtTask, $ResultType) {
-    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
-    $netTask = $asTask.Invoke($null, @($WinRtTask))
-    $netTask.Wait(-1) | Out-Null
-    $netTask.Result
-}
-[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime] | Out-Null
-$result = Await ([Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync($Message)) ([Windows.Security.Credentials.UI.UserConsentVerifierVerificationResult])
-Write-Output $result.ToString()
+_PS_CHECK = _PS_WINRT_HEADER + r"""
+$avail = AwaitResult ([Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync())
+Write-Output $avail.ToString()
 """
 
 
@@ -62,26 +45,15 @@ class WindowsHelloAuth:
     """Wrapper around Windows Hello UserConsentVerifier."""
 
     @staticmethod
-    def _run_powershell(script: str, args: list = None) -> Tuple[bool, str]:
+    def _run_powershell(script: str) -> Tuple[bool, str]:
         """Execute PowerShell and return (success, stdout or error)."""
-        cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script]
-        if args:
-            cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "-"] 
         try:
-            if args:
-                proc = subprocess.run(
-                    ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-                    capture_output=True,
-                    text=True,
-                    timeout=120,
-                )
-            else:
-                proc = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                    timeout=60,
-                )
+            proc = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
             output = (proc.stdout or "").strip()
             if proc.returncode != 0:
                 err = (proc.stderr or proc.stdout or "PowerShell error").strip()
@@ -134,12 +106,20 @@ class WindowsHelloAuth:
         return False, f"Verification failed: {result}"
 
     @staticmethod
+    def _build_verify_script(message: str) -> str:
+        safe_msg = message.replace("'", "''")
+        return _PS_WINRT_HEADER + f"""
+$asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('{safe_msg}')
+$result = AwaitResult $asyncOp
+Write-Output $result.ToString()
+"""
+
+    @staticmethod
     def check_availability() -> Tuple[bool, str]:
         ok, output = WindowsHelloAuth._run_powershell(_PS_CHECK)
         if ok and output:
             return WindowsHelloAuth._parse_availability(output)
 
-        # Optional winsdk fallback
         try:
             from winsdk.windows.security.credentials.ui import UserConsentVerifier
 
@@ -160,29 +140,9 @@ class WindowsHelloAuth:
         if not available:
             return False, avail_msg
 
-        # Escape message for PowerShell
-        safe_msg = message.replace("'", "''")
-        script = _PS_VERIFY.replace("$Message", f"'{safe_msg}'")
-        # Use param block properly
-        full_script = f"""
-param([string]$Message = '{safe_msg}')
-$ErrorActionPreference = 'Stop'
-Add-Type -AssemblyName System.Runtime.WindowsRuntime
-$asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-Object {{
-    $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
-    $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
-}})[0]
-Function Await($WinRtTask, $ResultType) {{
-    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
-    $netTask = $asTask.Invoke($null, @($WinRtTask))
-    $netTask.Wait(-1) | Out-Null
-    $netTask.Result
-}}
-[Windows.Security.Credentials.UI.UserConsentVerifier, Windows.Security.Credentials.UI, ContentType=WindowsRuntime] | Out-Null
-$result = Await ([Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync($Message)) ([Windows.Security.Credentials.UI.UserConsentVerifierVerificationResult])
-Write-Output $result.ToString()
-"""
-        ok, output = WindowsHelloAuth._run_powershell(full_script)
+        ok, output = WindowsHelloAuth._run_powershell(
+            WindowsHelloAuth._build_verify_script(message)
+        )
         if ok and output:
             return WindowsHelloAuth._parse_verification(output)
 
