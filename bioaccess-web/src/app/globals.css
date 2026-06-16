@@ -77,6 +77,34 @@
     @apply bg-zinc-50/80;
   }
 
+  .period-pill {
+    @apply rounded-lg border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-600 transition-all hover:border-zinc-300 hover:bg-zinc-50;
+  }
+
+  .period-pill-active {
+    @apply border-zinc-900 bg-zinc-900 text-white shadow-sm hover:border-zinc-900 hover:bg-zinc-800 hover:text-white;
+  }
+
+  .report-stat {
+    @apply panel relative overflow-hidden p-5;
+  }
+
+  .report-stat-accent {
+    @apply absolute right-0 top-0 h-16 w-16 translate-x-4 -translate-y-4 rounded-full opacity-10;
+  }
+
+  .badge-hours {
+    @apply inline-flex rounded-full bg-violet-50 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-violet-700 ring-1 ring-inset ring-violet-200;
+  }
+
+  .badge-time-in {
+    @apply inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-200;
+  }
+
+  .badge-time-out {
+    @apply inline-flex rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium tabular-nums text-amber-700 ring-1 ring-inset ring-amber-200;
+  }
+
   .notice {
     @apply rounded-lg border px-4 py-3 text-sm;
   }
