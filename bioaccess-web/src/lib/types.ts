@@ -33,6 +33,8 @@ export interface DashboardStats {
   present_today: number;
   absent_today: number;
   checkins_today: number;
+  enrolled_fingerprints?: number;
+  attendance_rate?: number;
 }
 
 export interface ActivityLog {

@@ -2,6 +2,30 @@
 
 Next.js fingerprint attendance system with **per-user** Windows Hello registration via WebAuthn.
 
+## How to start (important)
+
+BioAccess is a **full-stack Next.js app** — one command starts **both** the website and the API. There is no separate backend server.
+
+You only need **two things running**:
+
+| What | How |
+|------|-----|
+| **PostgreSQL** | Must be running (Windows service or pgAdmin) |
+| **BioAccess app** | `npm run dev` in `bioaccess-web/` |
+
+```powershell
+cd bioaccess-web
+npm install          # first time only
+npm run db:reset     # first time or to wipe all data
+npm run dev          # starts frontend + API at http://localhost:3000
+```
+
+Open **http://localhost:3000** in Chrome or Edge.
+
+Login: `admin` / `admin123`
+
+> Use `localhost` — WebAuthn fingerprint requires it (or HTTPS in production).
+
 ## Features
 
 - Register each employee with their own fingerprint (WebAuthn / Windows Hello)

@@ -2,49 +2,103 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --bg: #0f172a;
-  --card: #1e293b;
-  --border: #334155;
-  --text: #f8fafc;
-  --muted: #94a3b8;
-  --brand: #1a73e8;
+@layer base {
+  body {
+    @apply bg-zinc-50 text-zinc-900 antialiased;
+  }
 }
 
-body {
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-}
+@layer components {
+  .app-shell {
+    @apply min-h-screen bg-zinc-100/80;
+  }
 
-.card {
-  @apply rounded-xl border border-slate-700 bg-slate-800/80 p-6 shadow-lg;
-}
+  .panel {
+    @apply rounded-xl border border-zinc-200/80 bg-white shadow-sm;
+  }
 
-.btn {
-  @apply rounded-lg px-4 py-2.5 font-medium transition-colors disabled:opacity-50;
-}
+  .panel-header {
+    @apply border-b border-zinc-100 px-6 py-4;
+  }
 
-.btn-primary {
-  @apply btn bg-brand-500 text-white hover:bg-brand-600;
-}
+  .panel-body {
+    @apply p-6;
+  }
 
-.btn-success {
-  @apply btn bg-emerald-600 text-white hover:bg-emerald-500;
-}
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50;
+  }
 
-.btn-warning {
-  @apply btn bg-amber-600 text-white hover:bg-amber-500;
-}
+  .btn-brand {
+    @apply btn bg-zinc-900 text-white hover:bg-zinc-800 active:scale-[0.98];
+  }
 
-.btn-danger {
-  @apply btn bg-red-600 text-white hover:bg-red-500;
-}
+  .btn-outline {
+    @apply btn border border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400 hover:bg-zinc-50;
+  }
 
-.input {
-  @apply w-full rounded-lg border border-slate-600 bg-slate-900 px-3 py-2.5 text-white outline-none focus:border-brand-500;
-}
+  .btn-green {
+    @apply btn bg-emerald-700 text-white hover:bg-emerald-800;
+  }
 
-.label {
-  @apply mb-1 block text-sm text-slate-400;
+  .btn-amber {
+    @apply btn bg-amber-600 text-white hover:bg-amber-700;
+  }
+
+  .btn-red {
+    @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
+  }
+
+  .field {
+    @apply w-full rounded-lg border border-zinc-300 bg-white px-3.5 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 outline-none transition-shadow focus:border-zinc-900 focus:ring-2 focus:ring-zinc-900/10;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-sm font-medium text-zinc-700;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white;
+  }
+
+  .nav-link-active {
+    @apply bg-white text-zinc-900 shadow-sm hover:bg-white hover:text-zinc-900;
+  }
+
+  .data-table th {
+    @apply border-b border-zinc-200 pb-3 text-left text-xs font-semibold uppercase tracking-wide text-zinc-500;
+  }
+
+  .data-table td {
+    @apply border-b border-zinc-100 py-3.5 text-sm text-zinc-700;
+  }
+
+  .data-table tbody tr:hover td {
+    @apply bg-zinc-50/80;
+  }
+
+  .notice {
+    @apply rounded-lg border px-4 py-3 text-sm;
+  }
+
+  .notice-info {
+    @apply notice border-zinc-200 bg-zinc-50 text-zinc-700;
+  }
+
+  .notice-success {
+    @apply notice border-emerald-200 bg-emerald-50 text-emerald-800;
+  }
+
+  .notice-error {
+    @apply notice border-red-200 bg-red-50 text-red-800;
+  }
+
+  /* Marketing */
+  .section-label {
+    @apply text-sm font-semibold uppercase tracking-widest text-emerald-700;
+  }
+
+  .marketing-container {
+    @apply mx-auto max-w-6xl px-6;
+  }
 }

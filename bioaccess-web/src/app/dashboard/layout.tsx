@@ -11,16 +11,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => r.json())
-      .then((data) => {
-        if (!data.isLoggedIn) router.replace("/login");
-        else setUsername(data.username);
+      .then((d) => {
+        if (!d.isLoggedIn) router.replace("/login");
+        else setUsername(d.username);
       });
   }, [router]);
 
   if (!username) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-400">
-        Loading...
+      <div className="flex min-h-screen items-center justify-center bg-zinc-50 text-sm text-zinc-400">
+        Loading…
       </div>
     );
   }

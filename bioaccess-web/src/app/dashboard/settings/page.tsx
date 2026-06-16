@@ -1,63 +1,115 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 
 export default function SettingsPage() {
   const router = useRouter();
   const [message, setMessage] = useState("");
-  const [confirmText, setConfirmText] = useState("");
+  const [confirm, setConfirm] = useState("");
 
-  async function resetAll() {
-    if (confirmText !== "RESET") {
-      setMessage('Type RESET to confirm');
+  async function reset() {
+    if (confirm !== "RESET") {
+      setMessage('Type RESET in the box below.');
       return;
     }
-    if (!confirm("This deletes ALL users, fingerprints, attendance records, and logs. Continue?")) {
-      return;
-    }
+    if (!window.confirm("Delete all employees, fingerprints, attendance, and logs?")) return;
 
     const res = await fetch("/api/admin/reset", { method: "POST" });
     const data = await res.json();
     if (res.ok) {
       setMessage(data.message);
       setTimeout(() => router.push("/login"), 2000);
-    } else {
-      setMessage(data.error);
-    }
+    } else setMessage(data.error);
   }
 
   return (
     <div>
-      <h2 className="mb-6 text-2xl font-bold">Settings</h2>
+      <PageHeader
+        title="Settings"
+        description="System configuration, requirements, and data management"
+      />
 
-      <div className="card mb-6 max-w-xl">
-        <h3 className="mb-2 font-semibold">How fingerprint binding works</h3>
-        <ul className="list-inside list-disc space-y-1 text-sm text-slate-400">
-          <li>During registration, each employee scans their own fingerprint (Windows Hello).</li>
-          <li>The browser stores a unique credential tied to that employee only.</li>
-          <li>At check-in, only that employee&apos;s fingerprint can authenticate.</li>
-          <li>Another person&apos;s finger will fail verification.</li>
-        </ul>
-      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="text-sm font-medium">Quick links</h2>
+          </div>
+          <div className="panel-body space-y-3">
+            {[
+              { href: "/dashboard/users", label: "Manage employees", sub: "Add, edit, enroll fingerprints" },
+              { href: "/dashboard/attendance", label: "Record attendance", sub: "Check-in and check-out" },
+              { href: "/dashboard/reports", label: "Export reports", sub: "CSV for payroll and HR" },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex items-center justify-between rounded-lg border border-zinc-100 px-4 py-3 transition-colors hover:border-zinc-200 hover:bg-zinc-50"
+              >
+                <div>
+                  <p className="text-sm font-medium text-zinc-900">{item.label}</p>
+                  <p className="text-xs text-zinc-500">{item.sub}</p>
+                </div>
+                <span className="text-zinc-400">→</span>
+              </Link>
+            ))}
+          </div>
+        </div>
 
-      <div className="card max-w-xl border-red-900/50">
-        <h3 className="mb-2 font-semibold text-red-400">Clear Everything</h3>
-        <p className="mb-4 text-sm text-slate-400">
-          Removes all users, fingerprint credentials, attendance records, and activity logs.
-          Admin account is reset to admin / admin123.
-        </p>
-        <label className="label">Type RESET to confirm</label>
-        <input
-          className="input mb-4"
-          value={confirmText}
-          onChange={(e) => setConfirmText(e.target.value)}
-          placeholder="RESET"
-        />
-        <button className="btn-danger" onClick={resetAll}>
-          Clear All Data
-        </button>
-        {message && <p className="mt-4 text-sm text-slate-300">{message}</p>}
+        <div className="panel">
+          <div className="panel-header">
+            <h2 className="text-sm font-medium">System requirements</h2>
+          </div>
+          <div className="panel-body space-y-3 text-sm text-zinc-600">
+            <div className="flex justify-between border-b border-zinc-100 pb-3">
+              <span>Browser</span>
+              <span className="font-medium text-zinc-900">Chrome or Edge (Windows)</span>
+            </div>
+            <div className="flex justify-between border-b border-zinc-100 pb-3">
+              <span>Biometric</span>
+              <span className="font-medium text-zinc-900">Windows Hello configured</span>
+            </div>
+            <div className="flex justify-between border-b border-zinc-100 pb-3">
+              <span>Database</span>
+              <span className="font-medium text-zinc-900">PostgreSQL (local)</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Auth standard</span>
+              <span className="font-medium text-zinc-900">WebAuthn / FIDO2</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="panel lg:col-span-2">
+          <div className="panel-header">
+            <h2 className="text-sm font-medium">Fingerprint enrollment</h2>
+          </div>
+          <div className="panel-body text-sm leading-relaxed text-zinc-600">
+            <p>
+              Each employee enrolls their own fingerprint when registered. At check-in, the system verifies the scan matches that employee&apos;s stored credential — not anyone else&apos;s.
+            </p>
+            <p className="mt-3">
+              Fingerprint data never leaves the device. BioAccess stores only a cryptographic public key linked to each employee account.
+            </p>
+          </div>
+        </div>
+
+        <div className="panel border-red-200 lg:col-span-2">
+          <div className="panel-header">
+            <h2 className="text-sm font-medium text-red-700">Danger zone — reset all data</h2>
+          </div>
+          <div className="panel-body">
+            <p className="text-sm text-zinc-600">
+              Permanently removes all employees, fingerprints, attendance records, and activity logs. Admin account resets to <span className="font-mono">admin / admin123</span>.
+            </p>
+            <label className="field-label mt-4">Type RESET to confirm</label>
+            <input className="field max-w-xs" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
+            <button className="btn-red mt-4" onClick={reset}>Clear everything</button>
+            {message && <p className="notice-info mt-4">{message}</p>}
+          </div>
+        </div>
       </div>
     </div>
   );
