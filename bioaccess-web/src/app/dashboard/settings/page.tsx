@@ -2,17 +2,51 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const [message, setMessage] = useState("");
+  const { toast } = useToast();
   const [confirm, setConfirm] = useState("");
+  const [username, setUsername] = useState("");
+  const [role, setRole] = useState("admin");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/profile")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.username) setUsername(d.username);
+        if (d.role) setRole(d.role);
+      });
+  }, []);
+
+  async function saveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingProfile(true);
+    const res = await fetch("/api/auth/profile", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, currentPassword, newPassword }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      toast(data.message || "Profile updated successfully.", "success");
+      setCurrentPassword("");
+      setNewPassword("");
+    } else {
+      toast(data.error || "Failed to update profile.", "error");
+    }
+    setSavingProfile(false);
+  }
 
   async function reset() {
     if (confirm !== "RESET") {
-      setMessage('Type RESET in the box below.');
+      toast('Type RESET in the box to confirm.', "warning");
       return;
     }
     if (!window.confirm("Delete all employees, fingerprints, attendance, and logs?")) return;
@@ -20,9 +54,11 @@ export default function SettingsPage() {
     const res = await fetch("/api/admin/reset", { method: "POST" });
     const data = await res.json();
     if (res.ok) {
-      setMessage(data.message);
+      toast(data.message || "All data cleared.", "success");
       setTimeout(() => router.push("/login"), 2000);
-    } else setMessage(data.error);
+    } else {
+      toast(data.error || "Reset failed.", "error");
+    }
   }
 
   return (
@@ -33,6 +69,48 @@ export default function SettingsPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
+        <div className="panel lg:col-span-2">
+          <div className="panel-header">
+            <h2 className="text-sm font-medium">Profile settings</h2>
+          </div>
+          <form onSubmit={saveProfile} className="panel-body grid gap-4 md:grid-cols-2">
+            <div>
+              <label className="field-label">Username</label>
+              <input className="field" value={username} onChange={(e) => setUsername(e.target.value)} required />
+              <p className="mt-1 text-xs text-zinc-500">Shown in dashboard greeting and audit logs.</p>
+            </div>
+            <div>
+              <label className="field-label">Role</label>
+              <input className="field bg-zinc-50" value={role} disabled />
+            </div>
+            <div>
+              <label className="field-label">Current password</label>
+              <input
+                className="field"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <label className="field-label">New password (optional)</label>
+              <input
+                className="field"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Leave blank to keep current password"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <button className="btn-brand" type="submit" disabled={savingProfile}>
+                {savingProfile ? "Saving..." : "Save profile"}
+              </button>
+            </div>
+          </form>
+        </div>
+
         <div className="panel">
           <div className="panel-header">
             <h2 className="text-sm font-medium">Quick links</h2>
@@ -107,7 +185,6 @@ export default function SettingsPage() {
             <label className="field-label mt-4">Type RESET to confirm</label>
             <input className="field max-w-xs" value={confirm} onChange={(e) => setConfirm(e.target.value)} />
             <button className="btn-red mt-4" onClick={reset}>Clear everything</button>
-            {message && <p className="notice-info mt-4">{message}</p>}
           </div>
         </div>
       </div>

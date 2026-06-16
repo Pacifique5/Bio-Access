@@ -1,43 +1,61 @@
 "use client";
 
 import { startAuthentication } from "@simplewebauthn/browser";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { AttendanceRecord, User } from "@/lib/types";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import EmptyState from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
+
+function dateKey(value: string) {
+  return value.slice(0, 10);
+}
 
 export default function AttendancePage() {
-  const [users, setUsers] = useState<User[]>([]);
+  const { toast } = useToast();
+  const [allUsers, setAllUsers] = useState<User[]>([]);
   const [employeeId, setEmployeeId] = useState("");
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
-  const [message, setMessage] = useState("");
-  const [msgType, setMsgType] = useState<"info" | "success" | "error">("info");
   const [busy, setBusy] = useState(false);
 
   async function load() {
     const [u, a] = await Promise.all([fetch("/api/users"), fetch("/api/attendance")]);
-    const all = await u.json();
-    setUsers(all.filter((x: User) => x.fingerprint_registered));
-    setRecords(await a.json());
+    if (!u.ok) {
+      toast("Could not load employees.", "error");
+      return;
+    }
+    const users = await u.json();
+    if (!Array.isArray(users)) {
+      toast("Could not load employees.", "error");
+      return;
+    }
+    setAllUsers(users);
+    if (a.ok) setRecords(await a.json());
   }
 
   useEffect(() => { load(); }, []);
 
+  const enrolled = allUsers.filter((x) => x.fingerprint_registered);
+  const pending = allUsers.length - enrolled.length;
   const today = new Date().toISOString().slice(0, 10);
-  const todayRecords = records.filter((r) => r.attendance_date === today);
+  const todayRecords = records.filter((r) => dateKey(r.attendance_date) === today);
   const checkedIn = todayRecords.filter((r) => r.check_in_time).length;
   const checkedOut = todayRecords.filter((r) => r.check_out_time).length;
+  const selected = allUsers.find((u) => u.employee_id === employeeId);
 
   async function action(type: "check-in" | "check-out") {
     if (!employeeId) {
-      setMessage("Select an employee.");
-      setMsgType("error");
+      toast("Please select an employee first.", "warning");
+      return;
+    }
+    if (selected && !selected.fingerprint_registered) {
+      toast("This employee needs fingerprint enrollment first. Go to Employees → Re-scan.", "warning");
       return;
     }
     setBusy(true);
-    setMessage("Scan fingerprint…");
-    setMsgType("info");
+    toast("Scan fingerprint to verify…", "info");
     try {
       const optRes = await fetch("/api/webauthn/auth-options", {
         method: "POST",
@@ -56,12 +74,10 @@ export default function AttendancePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      setMessage(data.message);
-      setMsgType("success");
+      toast(data.message, "success");
       load();
     } catch (e: unknown) {
-      setMessage(e instanceof Error ? e.message : "Failed");
-      setMsgType("error");
+      toast(e instanceof Error ? e.message : "Attendance action failed", "error");
     } finally {
       setBusy(false);
     }
@@ -73,22 +89,33 @@ export default function AttendancePage() {
         title="Attendance"
         description="Check-in and check-out with per-employee fingerprint verification"
         action={
-          <button className="btn-outline text-sm" onClick={load}>
+          <button
+            className="btn-outline text-sm"
+            onClick={() => {
+              load();
+              toast("Attendance records refreshed.", "info");
+            }}
+          >
             Refresh
           </button>
         }
       />
 
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <StatCard label="Enrolled employees" value={users.length} hint="Can use fingerprint check-in" />
+        <StatCard label="Total employees" value={allUsers.length} hint={`${enrolled.length} ready · ${pending} pending`} />
         <StatCard label="Checked in today" value={checkedIn} accent="emerald" hint="Present on site" />
         <StatCard label="Checked out today" value={checkedOut} accent="amber" hint="Completed their shift" />
       </div>
 
-      {message && (
-        <p className={`mb-6 ${msgType === "success" ? "notice-success" : msgType === "error" ? "notice-error" : "notice-info"}`}>
-          {message}
-        </p>
+      {pending > 0 && (
+        <div className="notice-info mb-6 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            <strong>{pending}</strong> employee{pending > 1 ? "s" : ""} need fingerprint enrollment before check-in.
+          </span>
+          <Link href="/dashboard/users" className="text-sm font-medium underline">
+            Enroll fingerprints →
+          </Link>
+        </div>
       )}
 
       <div className="grid gap-8 lg:grid-cols-2">
@@ -100,32 +127,45 @@ export default function AttendancePage() {
           <div className="panel-body space-y-5">
             <div>
               <label className="field-label">Employee</label>
-              <select className="field" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
-                <option value="">Select employee…</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.employee_id}>
-                    {u.employee_id} — {u.full_name}
-                  </option>
-                ))}
-              </select>
-              {users.length === 0 && (
+              {allUsers.length === 0 ? (
+                <p className="text-sm text-zinc-500">No employees yet. Add staff from the Employees page.</p>
+              ) : (
+                <select className="field" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+                  <option value="">Select employee…</option>
+                  {allUsers.map((u) => (
+                    <option key={u.id} value={u.employee_id} disabled={!u.fingerprint_registered}>
+                      {u.employee_id} — {u.full_name}
+                      {u.fingerprint_registered ? "" : " (fingerprint pending)"}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {allUsers.length > 0 && enrolled.length === 0 && (
                 <p className="mt-2 text-xs text-amber-600">
-                  No enrolled employees yet. Add staff and scan fingerprints first.
+                  Employees exist but none have enrolled fingerprints yet. Open Employees, select each person, and click Re-scan.
                 </p>
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button disabled={busy} className="btn-green py-3" onClick={() => action("check-in")}>
+              <button
+                disabled={busy || enrolled.length === 0}
+                className="btn-green py-3"
+                onClick={() => action("check-in")}
+              >
                 {busy ? "Verifying…" : "Check in"}
               </button>
-              <button disabled={busy} className="btn-amber py-3" onClick={() => action("check-out")}>
+              <button
+                disabled={busy || enrolled.length === 0}
+                className="btn-amber py-3"
+                onClick={() => action("check-out")}
+              >
                 {busy ? "Verifying…" : "Check out"}
               </button>
             </div>
             <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-xs leading-relaxed text-zinc-600">
               <p className="font-medium text-zinc-800">How verification works</p>
               <ul className="mt-2 list-inside list-disc space-y-1">
-                <li>Only the enrolled fingerprint for the selected employee is accepted</li>
+                <li>Only employees with enrolled fingerprints appear as selectable</li>
                 <li>Wrong finger or another person&apos;s credential will be rejected</li>
                 <li>Use Chrome or Edge on Windows with Hello configured</li>
               </ul>
@@ -157,7 +197,7 @@ export default function AttendancePage() {
                 <tbody>
                   {records.slice(0, 20).map((r) => (
                     <tr key={r.id}>
-                      <td>{r.attendance_date}</td>
+                      <td>{dateKey(r.attendance_date)}</td>
                       <td className="font-medium text-zinc-900">{r.full_name}</td>
                       <td className="text-emerald-700">
                         {r.check_in_time ? new Date(r.check_in_time).toLocaleTimeString() : "—"}

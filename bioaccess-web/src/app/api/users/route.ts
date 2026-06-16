@@ -21,22 +21,30 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q");
 
+    const userSelect = `
+      SELECT u.id, u.employee_id, u.full_name, u.department, u.email, u.phone, u.role, u.created_at,
+        EXISTS(SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id) AS fingerprint_registered
+      FROM users u`;
+
     let rows: User[];
     if (q) {
       const pattern = `%${q}%`;
       rows = await query<User>(
-        `SELECT u.*, EXISTS(SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id) AS fingerprint_registered
-         FROM users u
+        `${userSelect}
          WHERE full_name ILIKE $1 OR employee_id ILIKE $1 OR department ILIKE $1 OR email ILIKE $1
          ORDER BY full_name`,
         [pattern]
       );
     } else {
-      rows = await query<User>(
-        `SELECT u.*, EXISTS(SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id) AS fingerprint_registered
-         FROM users u ORDER BY full_name`
-      );
+      rows = await query<User>(`${userSelect} ORDER BY full_name`);
     }
+
+    // Keep stored flag in sync when credentials exist
+    await query(
+      `UPDATE users u SET fingerprint_registered = TRUE
+       WHERE fingerprint_registered = FALSE
+       AND EXISTS (SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id)`
+    );
     return NextResponse.json(rows);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

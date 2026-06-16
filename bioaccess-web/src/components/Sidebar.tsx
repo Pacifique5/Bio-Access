@@ -11,6 +11,7 @@ import {
   IconSettings,
   IconUsers,
 } from "@/components/ui/Icons";
+import { useToast } from "@/components/ui/Toast";
 
 const NAV = [
   { href: "/dashboard", label: "Overview", icon: IconDashboard },
@@ -29,6 +30,7 @@ export default function Sidebar({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const { toast } = useToast();
   const [mobileOpen, setMobileOpen] = useState(false);
   const today = new Date().toLocaleDateString("en", {
     weekday: "long",
@@ -38,7 +40,8 @@ export default function Sidebar({
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/login");
+    toast("Signed out successfully.", "info");
+    setTimeout(() => router.push("/"), 400);
   }
 
   const nav = (

@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/components/Sidebar";
+import { useToast } from "@/components/ui/Toast";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const { toast } = useToast();
   const [username, setUsername] = useState<string | null>(null);
 
   useEffect(() => {
@@ -13,9 +15,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .then((r) => r.json())
       .then((d) => {
         if (!d.isLoggedIn) router.replace("/login");
-        else setUsername(d.username);
+        else {
+          setUsername(d.username);
+          if (sessionStorage.getItem("bioaccess-login-success") === "1") {
+            toast(`Welcome back, ${d.username}. Login successful.`, "success");
+            sessionStorage.removeItem("bioaccess-login-success");
+          }
+        }
       });
-  }, [router]);
+  }, [router, toast]);
 
   if (!username) {
     return (

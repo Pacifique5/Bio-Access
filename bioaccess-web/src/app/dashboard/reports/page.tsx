@@ -4,6 +4,7 @@ import { useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import EmptyState from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
 
 type Row = {
   employee_id: string;
@@ -16,23 +17,29 @@ type Row = {
 };
 
 export default function ReportsPage() {
+  const { toast } = useToast();
   const [period, setPeriod] = useState("daily");
   const [rows, setRows] = useState<Row[]>([]);
-  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function generate() {
     setLoading(true);
     const res = await fetch(`/api/reports?type=${period}`);
     if (res.ok) {
-      setRows(await res.json());
-      setNote("");
-    } else setNote("Could not load report.");
+      const data = await res.json();
+      setRows(data);
+      toast(`Report generated with ${data.length} records.`, "success");
+    } else {
+      toast("Could not load report.", "error");
+    }
     setLoading(false);
   }
 
   function exportCsv() {
-    if (!rows.length) return;
+    if (!rows.length) {
+      toast("Generate a report before exporting.", "warning");
+      return;
+    }
     const h = ["Employee ID", "Name", "Department", "Date", "Check In", "Check Out", "Hours"];
     const lines = rows.map((r) =>
       [r.employee_id, r.full_name, r.department, r.attendance_date, r.check_in_time || "", r.check_out_time || "", r.work_hours ?? ""].join(",")
@@ -42,7 +49,7 @@ export default function ReportsPage() {
     a.href = URL.createObjectURL(blob);
     a.download = `attendance-${period}.csv`;
     a.click();
-    setNote("CSV downloaded successfully.");
+    toast("CSV downloaded successfully.", "success");
   }
 
   const totalHours = rows.reduce((sum, r) => sum + (r.work_hours ?? 0), 0);
@@ -63,8 +70,6 @@ export default function ReportsPage() {
           <StatCard label="Total hours" value={totalHours.toFixed(1)} accent="violet" hint="Across all records" />
         </div>
       )}
-
-      {note && <p className="notice-info mb-6">{note}</p>}
 
       <div className="panel">
         <div className="panel-header flex flex-wrap items-center gap-3">

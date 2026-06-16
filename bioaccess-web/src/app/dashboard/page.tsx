@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { DashboardStats } from "@/lib/types";
 import StatCard from "@/components/ui/StatCard";
 import PageHeader from "@/components/ui/PageHeader";
+import { useToast } from "@/components/ui/Toast";
 
 type TodayRecord = {
   full_name: string;
@@ -16,6 +17,7 @@ type TodayRecord = {
 };
 
 export default function DashboardPage() {
+  const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [weekly, setWeekly] = useState<{ date: string; count: number }[]>([]);
   const [logs, setLogs] = useState<{ action: string; timestamp: string }[]>([]);
@@ -35,12 +37,24 @@ export default function DashboardPage() {
         setTodayRecords(data.todayRecords ?? []);
         setAdminName(data.adminName ?? "");
         setPending(data.pendingEnrollment ?? 0);
+        toast("Dashboard data refreshed.", "info");
       })
       .finally(() => setLoading(false));
   }
 
   useEffect(() => {
-    load();
+    setLoading(true);
+    fetch("/api/dashboard")
+      .then((r) => r.json())
+      .then((data) => {
+        setStats(data.stats);
+        setWeekly(data.weekly);
+        setLogs(data.logs);
+        setTodayRecords(data.todayRecords ?? []);
+        setAdminName(data.adminName ?? "");
+        setPending(data.pendingEnrollment ?? 0);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const max = Math.max(...weekly.map((d) => d.count), 1);

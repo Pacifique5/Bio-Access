@@ -47,18 +47,21 @@ export async function getRegistrationOptions(userId: number) {
   const options = await generateRegistrationOptions({
     rpName,
     rpID,
-    userName: user.email,
+    // Use employee ID — NOT email — so Chrome won't route to Google Password Manager
+    userName: user.employee_id,
     userDisplayName: user.full_name,
     userID: new TextEncoder().encode(String(user.id)),
     attestationType: "none",
+    preferredAuthenticatorType: "localDevice",
     authenticatorSelection: {
       authenticatorAttachment: "platform",
       userVerification: "required",
-      residentKey: "preferred",
+      residentKey: "discouraged",
+      requireResidentKey: false,
     },
     excludeCredentials: existingCreds.map((c) => ({
       id: c.credential_id,
-      transports: (c.transports as AuthenticatorTransportFuture[]) ?? undefined,
+      transports: (c.transports as AuthenticatorTransportFuture[]) ?? ["internal"],
     })),
   });
 
@@ -109,16 +112,12 @@ export async function getAuthenticationOptions(employeeId: string) {
     id: number;
     employee_id: string;
     full_name: string;
-    fingerprint_registered: boolean;
   }>(
-    "SELECT id, employee_id, full_name, fingerprint_registered FROM users WHERE employee_id = $1",
+    "SELECT id, employee_id, full_name FROM users WHERE employee_id = $1",
     [employeeId.trim().toUpperCase()]
   );
 
   if (!user) throw new Error("Employee not found");
-  if (!user.fingerprint_registered) {
-    throw new Error("Fingerprint not registered for this employee. Register first.");
-  }
 
   const creds = await query<{
     credential_id: string;
@@ -136,7 +135,7 @@ export async function getAuthenticationOptions(employeeId: string) {
     userVerification: "required",
     allowCredentials: creds.map((c) => ({
       id: c.credential_id,
-      transports: (c.transports as AuthenticatorTransportFuture[]) ?? undefined,
+      transports: (c.transports as AuthenticatorTransportFuture[]) ?? ["internal"],
     })),
   });
 

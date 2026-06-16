@@ -4,34 +4,35 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import { useToast } from "@/components/ui/Toast";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("admin123");
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setError("");
     const res = await fetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    if (res.ok) router.push("/dashboard");
-    else {
+    if (res.ok) {
+      sessionStorage.setItem("bioaccess-login-success", "1");
+      router.push("/dashboard");
+    } else {
       const data = await res.json();
-      setError(data.error || "Invalid credentials");
+      toast(data.error || "Invalid credentials", "error");
     }
     setLoading(false);
   }
 
   return (
     <div className="flex min-h-screen">
-      {/* Brand panel */}
       <div className="hidden w-1/2 flex-col justify-between bg-zinc-900 p-12 text-white lg:flex">
         <Logo className="[&_span:last-child]:text-white [&_span:first-child]:bg-white [&_span:first-child]:text-zinc-900" />
         <div>
@@ -54,7 +55,6 @@ export default function LoginPage() {
         </Link>
       </div>
 
-      {/* Form */}
       <div className="flex flex-1 flex-col justify-center bg-zinc-50 px-6 py-12">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 lg:hidden">
@@ -87,8 +87,6 @@ export default function LoginPage() {
                   placeholder="••••••••"
                 />
               </div>
-
-              {error && <p className="notice-error">{error}</p>}
 
               <button type="submit" disabled={loading} className="btn-brand w-full py-3">
                 {loading ? "Signing in…" : "Sign in to dashboard"}

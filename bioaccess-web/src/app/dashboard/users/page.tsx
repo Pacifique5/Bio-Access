@@ -7,16 +7,16 @@ import PageHeader from "@/components/ui/PageHeader";
 import StatCard from "@/components/ui/StatCard";
 import Badge from "@/components/ui/Badge";
 import EmptyState from "@/components/ui/EmptyState";
+import { useToast } from "@/components/ui/Toast";
 
 const EMPTY = { full_name: "", department: "", email: "", phone: "", role: "employee" };
 
 export default function UsersPage() {
+  const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [search, setSearch] = useState("");
   const [form, setForm] = useState(EMPTY);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [message, setMessage] = useState("");
-  const [msgType, setMsgType] = useState<"info" | "success" | "error">("info");
   const [scanning, setScanning] = useState(false);
 
   async function load(q = "") {
@@ -29,11 +29,6 @@ export default function UsersPage() {
   const enrolled = users.filter((u) => u.fingerprint_registered).length;
   const pending = users.length - enrolled;
 
-  function notify(text: string, type: typeof msgType = "info") {
-    setMessage(text);
-    setMsgType(type);
-  }
-
   function selectUser(u: User) {
     setSelectedId(u.id);
     setForm({
@@ -45,20 +40,24 @@ export default function UsersPage() {
     });
   }
 
-  async function deleteUser(userId: number) {
-    if (!confirm("Delete this employee?")) return;
-    await fetch(`/api/users/${userId}`, { method: "DELETE" });
+  async function deleteUser(userId: number, name?: string) {
+    if (!confirm(`Delete ${name || "this employee"}?`)) return;
+    const res = await fetch(`/api/users/${userId}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast("Failed to delete employee.", "error");
+      return;
+    }
     if (selectedId === userId) {
       setSelectedId(null);
       setForm(EMPTY);
     }
-    notify("Employee deleted.", "success");
+    toast(`${name || "Employee"} deleted successfully.`, "success");
     load(search);
   }
 
   async function registerFingerprint(userId: number) {
     setScanning(true);
-    notify("Waiting for fingerprint scan…", "info");
+    toast("Use Windows Hello fingerprint on this PC. If Chrome shows Google Password Manager, click “Save another way”.", "info");
     try {
       const optRes = await fetch("/api/webauthn/register-options", {
         method: "POST",
@@ -68,7 +67,7 @@ export default function UsersPage() {
       const opts = await optRes.json();
       if (!optRes.ok) throw new Error(opts.error);
 
-      const att = await startRegistration({ optionsJSON: opts });
+      const att = await startRegistration({ optionsJSON: opts, useAutoRegister: false });
       const verifyRes = await fetch("/api/webauthn/register-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -77,10 +76,10 @@ export default function UsersPage() {
       const result = await verifyRes.json();
       if (!verifyRes.ok) throw new Error(result.error);
 
-      notify("Fingerprint saved for this employee.", "success");
+      toast("Fingerprint enrolled successfully.", "success");
       load(search);
     } catch (e: unknown) {
-      notify(e instanceof Error ? e.message : "Registration failed", "error");
+      toast(e instanceof Error ? e.message : "Fingerprint registration failed", "error");
     } finally {
       setScanning(false);
     }
@@ -89,12 +88,16 @@ export default function UsersPage() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (selectedId) {
-      await fetch(`/api/users/${selectedId}`, {
+      const res = await fetch(`/api/users/${selectedId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      notify("Employee updated.", "success");
+      if (!res.ok) {
+        toast("Failed to update employee.", "error");
+        return;
+      }
+      toast("Employee updated successfully.", "success");
       load(search);
       return;
     }
@@ -106,11 +109,11 @@ export default function UsersPage() {
     });
     const user = await res.json();
     if (!res.ok) {
-      notify(user.error, "error");
+      toast(user.error || "Failed to create employee.", "error");
       return;
     }
     setSelectedId(user.id);
-    notify(`Created ${user.employee_id}. Scan fingerprint next.`, "info");
+    toast(`Employee ${user.employee_id} created. Enroll fingerprint next.`, "success");
     await registerFingerprint(user.id);
     load(search);
   }
@@ -127,12 +130,6 @@ export default function UsersPage() {
         <StatCard label="Fingerprints enrolled" value={enrolled} accent="emerald" hint="Ready for check-in" />
         <StatCard label="Pending enrollment" value={pending} accent="amber" hint="Need fingerprint scan" />
       </div>
-
-      {message && (
-        <p className={`mb-6 ${msgType === "success" ? "notice-success" : msgType === "error" ? "notice-error" : "notice-info"}`}>
-          {message}
-        </p>
-      )}
 
       <div className="grid gap-8 lg:grid-cols-5">
         <form onSubmit={onSubmit} className="panel lg:col-span-2">
@@ -164,6 +161,14 @@ export default function UsersPage() {
                 <option value="student">Student</option>
               </select>
             </div>
+            <div className="rounded-lg border border-zinc-100 bg-zinc-50 p-4 text-xs leading-relaxed text-zinc-600">
+              <p className="font-medium text-zinc-800">Fingerprint enrollment tips</p>
+              <ul className="mt-2 list-inside list-disc space-y-1">
+                <li>Use Chrome or Edge on Windows with Windows Hello enabled</li>
+                <li>If Google Password Manager appears, choose <strong>Save another way</strong> → <strong>This device</strong></li>
+                <li>Microsoft Edge often goes straight to Windows Hello fingerprint</li>
+              </ul>
+            </div>
             <div className="flex flex-wrap gap-2 pt-2">
               <button type="submit" className="btn-brand">
                 {selectedId ? "Save changes" : "Create & scan finger"}
@@ -176,7 +181,10 @@ export default function UsersPage() {
                   <button
                     type="button"
                     className="btn-red"
-                    onClick={() => deleteUser(selectedId)}
+                    onClick={() => {
+                      const u = users.find((x) => x.id === selectedId);
+                      deleteUser(selectedId, u?.full_name);
+                    }}
                   >
                     Delete
                   </button>
@@ -237,6 +245,7 @@ export default function UsersPage() {
                             onClick={(e) => {
                               e.stopPropagation();
                               selectUser(u);
+                              toast(`Editing ${u.full_name}`, "info");
                             }}
                           >
                             Edit
@@ -246,7 +255,7 @@ export default function UsersPage() {
                             className="btn-red px-3 py-1.5 text-xs"
                             onClick={(e) => {
                               e.stopPropagation();
-                              deleteUser(u.id);
+                              deleteUser(u.id, u.full_name);
                             }}
                           >
                             Delete

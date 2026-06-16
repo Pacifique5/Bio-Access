@@ -101,4 +101,74 @@
   .marketing-container {
     @apply mx-auto max-w-6xl px-6;
   }
+
+  /* Toasts */
+  .toast-container {
+    @apply fixed right-4 top-4 z-[100] flex w-[min(100vw-2rem,22rem)] flex-col gap-2;
+  }
+
+  .toast-item {
+    @apply flex items-start gap-2.5 rounded-lg border bg-white px-3.5 py-2.5 text-sm shadow-lg shadow-zinc-900/10 animate-toast-in;
+  }
+
+  .toast-icon {
+    @apply mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold;
+  }
+
+  .toast-message {
+    @apply flex-1 leading-snug text-zinc-800;
+  }
+
+  .toast-close {
+    @apply -mr-1 shrink-0 rounded p-0.5 text-base leading-none text-zinc-400 transition-colors hover:text-zinc-700;
+  }
+
+  .toast-success {
+    @apply border-emerald-200;
+  }
+
+  .toast-success .toast-icon {
+    @apply bg-emerald-100 text-emerald-700;
+  }
+
+  .toast-error {
+    @apply border-red-200;
+  }
+
+  .toast-error .toast-icon {
+    @apply bg-red-100 text-red-700;
+  }
+
+  .toast-info {
+    @apply border-zinc-200;
+  }
+
+  .toast-info .toast-icon {
+    @apply bg-zinc-100 text-zinc-600;
+  }
+
+  .toast-warning {
+    @apply border-amber-200;
+  }
+
+  .toast-warning .toast-icon {
+    @apply bg-amber-100 text-amber-700;
+  }
+}
+
+@layer utilities {
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateX(1rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  .animate-toast-in {
+    animation: toast-in 0.25s ease-out;
+  }
 }

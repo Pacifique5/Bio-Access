@@ -8,7 +8,8 @@ export async function GET() {
     const session = await requireAdmin();
     const total = await queryOne<{ count: string }>("SELECT COUNT(*) FROM users");
     const enrolled = await queryOne<{ count: string }>(
-      "SELECT COUNT(*) FROM users WHERE fingerprint_registered = TRUE"
+      `SELECT COUNT(DISTINCT u.id) FROM users u
+       WHERE EXISTS (SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id)`
     );
     const present = await queryOne<{ count: string }>(
       "SELECT COUNT(*) FROM attendance WHERE attendance_date = CURRENT_DATE AND check_in_time IS NOT NULL"
@@ -52,7 +53,8 @@ export async function GET() {
     );
 
     const pendingEnrollment = await queryOne<{ count: string }>(
-      "SELECT COUNT(*) FROM users WHERE fingerprint_registered = FALSE"
+      `SELECT COUNT(*) FROM users u
+       WHERE NOT EXISTS (SELECT 1 FROM webauthn_credentials w WHERE w.user_id = u.id)`
     );
 
     return NextResponse.json({

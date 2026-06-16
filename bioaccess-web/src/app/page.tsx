@@ -357,7 +357,7 @@ export default function LandingPage() {
               Sign in to dashboard
             </Link>
             <Link href="/login" className="btn-outline px-8 py-3 text-base">
-              Create admin account
+              Explore dashboard
             </Link>
           </div>
         </div>
