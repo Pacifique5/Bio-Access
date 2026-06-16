@@ -17,7 +17,6 @@ AVAILABILITY_MESSAGES = {
     "device_busy": "Biometric device is busy. Try again shortly.",
 }
 
-# Shared WinRT await helper – infers result type from IAsyncOperation<T>
 _PS_WINRT_HEADER = r"""
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -25,10 +24,9 @@ $asTaskGeneric = ([System.WindowsRuntimeSystemExtensions].GetMethods() | Where-O
     $_.Name -eq 'AsTask' -and $_.GetParameters().Count -eq 1 -and
     $_.GetParameters()[0].ParameterType.Name -eq 'IAsyncOperation`1'
 })[0]
-Function AwaitResult($AsyncOp) {
-    $resultType = $AsyncOp.GetType().GetGenericArguments()[0]
-    $asTask = $asTaskGeneric.MakeGenericMethod($resultType)
-    $netTask = $asTask.Invoke($null, @($AsyncOp))
+Function Await($WinRtTask, $ResultType) {
+    $asTask = $asTaskGeneric.MakeGenericMethod($ResultType)
+    $netTask = $asTask.Invoke($null, @($WinRtTask))
     $netTask.Wait(-1) | Out-Null
     $netTask.Result
 }
@@ -36,7 +34,7 @@ Function AwaitResult($AsyncOp) {
 """
 
 _PS_CHECK = _PS_WINRT_HEADER + r"""
-$avail = AwaitResult ([Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync())
+$avail = Await ([Windows.Security.Credentials.UI.UserConsentVerifier]::CheckAvailabilityAsync()) ([Windows.Security.Credentials.UI.UserConsentVerifierAvailability])
 Write-Output $avail.ToString()
 """
 
@@ -46,7 +44,6 @@ class WindowsHelloAuth:
 
     @staticmethod
     def _run_powershell(script: str) -> Tuple[bool, str]:
-        """Execute PowerShell and return (success, stdout or error)."""
         try:
             proc = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
@@ -109,8 +106,7 @@ class WindowsHelloAuth:
     def _build_verify_script(message: str) -> str:
         safe_msg = message.replace("'", "''")
         return _PS_WINRT_HEADER + f"""
-$asyncOp = [Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('{safe_msg}')
-$result = AwaitResult $asyncOp
+$result = Await ([Windows.Security.Credentials.UI.UserConsentVerifier]::RequestVerificationAsync('{safe_msg}')) ([Windows.Security.Credentials.UI.UserConsentVerificationResult])
 Write-Output $result.ToString()
 """
 
